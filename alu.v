@@ -162,7 +162,7 @@ begin
 			endcase
 		end
 		5'd10: result = l_in_signed * r_in_signed; // Signed multiplication
-		5'd11: result = {r_in[19:0], l_in[11:0]}; // Load constant into upper bits of a word
+		5'd11: result = {r_in[19:0], 12'b0}; // Load constant into upper bits of a word
 		5'd12: // Check equal
 		begin
 			result[31:1] = 31'b0;

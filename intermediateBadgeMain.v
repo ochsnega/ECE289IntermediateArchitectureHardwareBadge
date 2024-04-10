@@ -33,8 +33,8 @@ registerFile my_registers(clk, rst, reg_w_data, reg_w_add, reg_w_en, reg_rl_add,
 reg [6:0] S;
 reg [6:0] NS;
 
-// Define states of FSM (TODO)
-parameter START = 7'd0, // TODO
+// Define states of FSM 
+parameter START = 7'd0,
 			 FETCH = 7'd1,
 			 FETCH_BUF = 7'd2,
 			 DECODE = 7'd3,
@@ -92,7 +92,7 @@ begin
 		S <= NS;
 end
 
-// Choose next state (TODO)
+// Choose next state
 always@(*)
 begin
 	case (S)
@@ -152,6 +152,7 @@ begin
 		GET_REG_BR_ALU: NS = CALC_BR_ALU;
 		CALC_BR_ALU: NS = DECIDE_BR;
 		DECIDE_BR: NS = FETCH;
+		PC_INC: NS = FETCH; // Increment PC
 		default: NS = ERROR; // Catch Errors
 	endcase
 end
@@ -177,7 +178,7 @@ begin
 	end
 	else
 	begin
-		case (S) // Change variables for each state (TODO)
+	case (S) // Change variables for each state (TODO)
 		FETCH: 
 		begin
 			mem_address <= PC;
@@ -188,7 +189,182 @@ begin
 		begin
 			IR <= mem_out;
 		end
+		PC_INC:
+		begin
+			reg_w_en <= 1'b0;
+			mem_wren <= 1'b0;
+			PC <= PC + 1'b1;
+		end
+		RR_ALU: // Register-Register ALU Instructions
+		begin
+		case (IR[14:12])
+			3'b000: 
+			begin
+			case (IR[31:25])
+				7'b0000000: alu_control <= 5'd0;
+				7'b0100000: alu_control <= 5'd1;
+				7'b0000001: alu_control <= 5'd10;
+				default: alu_control <= 5'd31;
+			endcase
+			end
+			3'b001: alu_control <= 5'd9;
+			3'b010: alu_control <= 5'd5;
+			3'b011: alu_control <= 5'd6;
+			3'b100: alu_control <= 5'd4;
+			3'b101:
+			begin
+			case (IR[31:25])
+				7'b0100000: alu_control <= 5'd7;
+				7'b0000000: alu_control <= 5'd8;
+				default: alu_control <= 5'd31;
+			endcase
+			end
+			3'b110: alu_control <= 3;
+			3'b111: alu_control <= 2;
 		endcase
+		end
+		GET_REG_RR_ALU:
+		begin
+			reg_rl_add <= IR[19:15];
+			reg_rr_add <= IR[24:20];
+		end
+		CALC_RR_ALU:
+		begin
+			alu_l_in <= reg_rl_data;
+			alu_r_in <= reg_rr_data;
+			reg_w_data <= alu_result;
+		end
+		STORE_REG_RR_ALU:
+		begin
+			reg_w_data <= alu_result;
+			reg_w_add <= IR[11:7];
+			reg_w_en <= 1'b1;
+		end
+		RI_ALU: // Register-Immediate ALU Instructions
+		begin
+		case (IR[14:12])
+			3'b000: alu_control <= 5'd0;
+			3'b001: alu_control <= 5'd9;
+			3'b010: alu_control <= 5'd5;
+			3'b011: alu_control <= 5'd6;
+			3'b100: alu_control <= 5'd4;
+			3'b101:
+			begin
+			case (IR[31:25])
+				7'b0100000: alu_control <= 5'd7;
+				7'b0000000: alu_control <= 5'd8;
+				default: alu_control <= 5'd31;
+			endcase
+			end
+			3'b110: alu_control <= 5'd3;
+			3'b111: alu_control <= 5'd2;
+		endcase
+		end
+		GET_REG_RI_ALU:
+		begin
+			reg_rl_add <= IR[19:15];
+		case (IR[31])
+			1'b0: alu_r_in <= {20'h0, IR[31:20]};
+			1'b1: alu_r_in <= {20'hfffff, IR[31:20]};
+		endcase
+		end
+		CALC_RI_ALU:
+		begin
+			alu_l_in <= reg_rl_data;
+			reg_w_data <= alu_result;
+		end
+		STORE_REG_RI_ALU:
+		begin
+			reg_w_data <= alu_result;
+			reg_w_add <= IR[11:7];
+			reg_w_en <= 1'b1;
+		end
+		LUI_ALU: alu_control <= 5'd11; // LUI ALU Instruction
+		CALC_LUI_ALU:
+		begin
+			alu_r_in <= {12'b0, IR[31:12]};
+			reg_w_data <= alu_result;
+		end
+		STORE_REG_LUI_ALU:
+		begin
+			reg_w_data <= alu_result;
+			reg_w_add <= IR[11:7];
+			reg_w_en <= 1'b1;
+		end
+		AUIPC_ALU: alu_control <= 5'd11; // AUIPC ALU Instruction
+		CALC_AUIPC_ALU:
+		begin
+			alu_r_in <= {12'b0, IR[31:12]};
+			reg_w_data <= alu_result + PC;
+		end
+		STORE_REG_AUIPC_ALU:
+		begin
+			reg_w_data <= alu_result + PC;
+			reg_w_add <= IR[11:7];
+			reg_w_en <= 1'b1;
+		end
+		LW: // Load Word Instruction
+		begin
+			reg_rl_add <= IR[19:15];
+		case (IR[31])
+			1'b0: mem_address <= reg_rl_data + IR[31:20];
+			1'b1: mem_address <= reg_rl_data + {20'hfffff, IR[31:20]};
+		endcase
+		end
+		GET_REG_LW:
+		begin
+		case (IR[31])
+			1'b0: mem_address <= reg_rl_data + IR[31:20];
+			1'b1: mem_address <= reg_rl_data + {20'hfffff, IR[31:20]};
+		endcase
+		end
+		GET_ADD_LW:
+		begin
+		case (IR[31])
+			1'b0: mem_address <= reg_rl_data + IR[31:20];
+			1'b1: mem_address <= reg_rl_data + {20'hfffff, IR[31:20]};
+		endcase
+			reg_w_data <= mem_out;
+		end
+		GET_WORD_LW:
+		begin
+			reg_w_data <= mem_out;
+			reg_w_en <= 1'b1;
+			reg_w_add <= IR[11:7];
+		end
+		LW_BUFF: 
+		begin
+			reg_w_en <= 1'b0;
+		end
+		SW: // Store Word Instruction
+		begin
+			reg_rl_add <= IR[19:15]; // Mem address
+			reg_rr_add <= IR[24:20]; // Mem data
+		end
+		GET_REG_SW: 
+		begin
+		case (IR[31])
+			1'b0: mem_address <= reg_rl_data + {20'b0, IR[31:25], IR[11:7]};
+			1'b1: mem_address <= reg_rl_data + {20'hfffff, IR[31:25], IR[11:7]};
+		endcase
+		end
+		GET_ADD_SW:
+		begin
+		case (IR[31])
+			1'b0: mem_address <= reg_rl_data + {20'b0, IR[31:25], IR[11:7]};
+			1'b1: mem_address <= reg_rl_data + {20'hfffff, IR[31:25], IR[11:7]};
+		endcase
+			mem_data <= reg_rr_data;
+		end
+		STORE_WORD_SW:
+		begin
+			mem_wren <= 1'b1;
+		end
+		SW_BUFF:
+		begin
+			mem_wren <= 1'b0;
+		end
+	endcase
 	end
 end
 
