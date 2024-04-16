@@ -1,14 +1,19 @@
 module intermediateBadgeMain( // TODO
 	input clk,
 	input rst,
-	input start
-	
+	input start,
+	input g_control,
+	input [4:0] r_control,
+	output reg [6:0] g_out,
+	output reg [15:0] r_out,
+	output reg reg_w_en,
+	output reg mem_wren
 );
 
 // Instantiate memory (Note: This takes a clock cycle)
 reg [7:0] mem_address;
 reg [31:0] mem_data;
-reg mem_wren;
+//reg mem_wren;
 wire [31:0] mem_out;
 Mem my_mem(mem_address, clk, mem_data, mem_wren, mem_out);
 
@@ -22,7 +27,7 @@ alu my_alu(alu_l_in, alu_r_in, alu_control, alu_result);
 // Instantiate register file (Note: This takes a clock cycle!)
 reg [31:0] reg_w_data;
 reg [4:0] reg_w_add;
-reg reg_w_en;
+//reg reg_w_en;
 reg [4:0] reg_rl_add;
 reg [4:0] reg_rr_add;
 wire [31:0] reg_rl_data;
@@ -96,7 +101,17 @@ end
 always@(*)
 begin
 	case (S)
-		START: NS = FETCH;
+		START:
+		begin
+			if (start == 1'b1)
+			begin
+				NS = FETCH;
+			end
+			else
+			begin
+				NS = START;
+			end
+		end
 		FETCH: NS = FETCH_BUF;
 		FETCH_BUF: NS = DECODE;
 		DECODE:
@@ -153,6 +168,7 @@ begin
 		CALC_BR_ALU: NS = DECIDE_BR;
 		DECIDE_BR: NS = FETCH;
 		PC_INC: NS = FETCH; // Increment PC
+		ERROR: NS = ERROR;
 		default: NS = ERROR; // Catch Errors
 	endcase
 end
@@ -307,22 +323,22 @@ begin
 		begin
 			reg_rl_add <= IR[19:15];
 		case (IR[31])
-			1'b0: mem_address <= reg_rl_data + IR[31:20];
-			1'b1: mem_address <= reg_rl_data + {20'hfffff, IR[31:20]};
+			1'b0: mem_address <= {reg_rl_data[31], reg_rl_data[6:0]} + {1'b0, IR[26:25], IR[11:7]};
+			1'b1: mem_address <= {reg_rl_data[31], reg_rl_data[6:0]} + {1'b1, IR[26:25], IR[11:7]};
 		endcase
 		end
 		GET_REG_LW:
 		begin
 		case (IR[31])
-			1'b0: mem_address <= reg_rl_data + IR[31:20];
-			1'b1: mem_address <= reg_rl_data + {20'hfffff, IR[31:20]};
+			1'b0: mem_address <= {reg_rl_data[31], reg_rl_data[6:0]} + {1'b0, IR[26:25], IR[11:7]};
+			1'b1: mem_address <= {reg_rl_data[31], reg_rl_data[6:0]} + {1'b1, IR[26:25], IR[11:7]};
 		endcase
 		end
 		GET_ADD_LW:
 		begin
 		case (IR[31])
-			1'b0: mem_address <= reg_rl_data + IR[31:20];
-			1'b1: mem_address <= reg_rl_data + {20'hfffff, IR[31:20]};
+			1'b0: mem_address <= {reg_rl_data[31], reg_rl_data[6:0]} + {1'b0, IR[26:25], IR[11:7]};
+			1'b1: mem_address <= {reg_rl_data[31], reg_rl_data[6:0]} + {1'b1, IR[26:25], IR[11:7]};
 		endcase
 			reg_w_data <= mem_out;
 		end
@@ -344,15 +360,15 @@ begin
 		GET_REG_SW: 
 		begin
 		case (IR[31])
-			1'b0: mem_address <= reg_rl_data + {20'b0, IR[31:25], IR[11:7]};
-			1'b1: mem_address <= reg_rl_data + {20'hfffff, IR[31:25], IR[11:7]};
+			1'b0: mem_address <= {reg_rl_data[31], reg_rl_data[6:0]} + {1'b0, IR[26:25], IR[11:7]};
+			1'b1: mem_address <= {reg_rl_data[31], reg_rl_data[6:0]} + {1'b1, IR[26:25], IR[11:7]};
 		endcase
 		end
 		GET_ADD_SW:
 		begin
 		case (IR[31])
-			1'b0: mem_address <= reg_rl_data + {20'b0, IR[31:25], IR[11:7]};
-			1'b1: mem_address <= reg_rl_data + {20'hfffff, IR[31:25], IR[11:7]};
+			1'b0: mem_address <= {reg_rl_data[31], reg_rl_data[6:0]} + {1'b0, IR[26:25], IR[11:7]};
+			1'b1: mem_address <= {reg_rl_data[31], reg_rl_data[6:0]} + {1'b1, IR[26:25], IR[11:7]};
 		endcase
 			mem_data <= reg_rr_data;
 		end
@@ -364,8 +380,134 @@ begin
 		begin
 			mem_wren <= 1'b0;
 		end
+		JAL: // JAL Instruction
+		begin
+			reg_w_data <= {24'b0, PC + 8'd4};
+			reg_w_add <= IR[11:7];
+			reg_w_en <= 1'b1;
+		end
+		GET_REG_JAL:
+		begin
+			PC <= PC + {IR[31], IR[18:12]};
+			reg_w_en <= 1'b0;
+		end
+		JALR: // JALR Instruction
+		begin
+			reg_w_data <= {24'b0, PC + 8'd4};
+			reg_w_add <= IR[11:7];
+			reg_w_en <= 1'b1;
+			reg_rl_add <= IR[19:15];
+		end
+		GET_REG_JALR:
+		begin
+			reg_w_en <= 1'b0;
+			PC <= ({reg_rl_data[31], reg_rl_data[6:0]} + {IR[31], IR[26:20]}) & 8'hfe;
+		end
+		BR_ALU:
+		begin
+		case (IR[14:12])
+			3'b000: alu_control <= 5'd12;
+			3'b001: alu_control <= 5'd13;
+			3'b100: alu_control <= 5'd14;
+			3'b101: alu_control <= 5'd15;
+			3'b110: alu_control <= 5'd16;
+			3'b111: alu_control <= 5'd17;
+			default: alu_control <= 5'd31;
+		endcase
+			reg_rl_add <= IR[19:15];
+			reg_rr_add <= IR[24:20];
+		end
+		GET_REG_BR_ALU:
+		begin
+			reg_rl_add <= IR[19:15];
+			reg_rr_add <= IR[24:20];
+			alu_l_in <= reg_rl_data;
+			alu_r_in <= reg_rr_data;
+		end
+		CALC_BR_ALU:
+		begin
+			alu_l_in <= reg_rl_data;
+			alu_r_in <= reg_rr_data;
+		end
+		DECIDE_BR:
+		begin
+			if (alu_result[0] == 1'b1)
+			begin
+				PC <= PC + {IR[31], IR[26:25], IR[11:7]};
+			end
+			else
+			begin
+				PC <= PC + 8'd4;
+			end
+		end
+		ERROR: alu_control <= 5'd20;
+		default:
+		begin
+			PC <= 8'b0;
+			IR <= 32'b0;
+			mem_address <= 8'b0;
+			mem_data <= 32'b0;
+			mem_wren <= 1'b0;
+			alu_l_in <= 32'b0;
+			alu_r_in <= 32'b0;
+			alu_control <= 5'b0;
+			reg_w_data <= 32'b0;
+			reg_w_add <= 5'b0;
+			reg_w_en <= 1'b0;
+			reg_rl_add <= 5'b0;
+			reg_rr_add <= 5'b0;
+		end
 	endcase
 	end
 end
+
+
+// Input/output handling (multiplexor for showing state of system/each signal)
+// Green LED
+always@(*)
+begin
+	if (g_control == 1'b1)
+	begin
+		g_out = S;
+	end
+	else
+	begin
+		g_out = NS;
+	end
+end
+
+// Red LED
+always@(*)
+begin
+case (r_control)
+	5'b00000: r_out = IR[31:16];
+	5'b00001: r_out = IR[15:0];
+	5'b00010: r_out = {8'b0, PC};
+	5'b00011: r_out = {8'b0, mem_address};
+	5'b00100: r_out = mem_data[31:16];
+	5'b00101: r_out = mem_data[15:0];
+	5'b00110: r_out = mem_out[31:16];
+	5'b00111: r_out = mem_out[15:0];
+	5'b01000: r_out = alu_l_in[31:16];
+	5'b01001: r_out = alu_l_in[15:0];
+	5'b01010: r_out = alu_r_in[31:16];
+	5'b01011: r_out = alu_r_in[15:0];
+	5'b01100: r_out = alu_result[31:16];
+	5'b01101: r_out = alu_result[15:0];
+	5'b01110: r_out = {11'b0, alu_control};
+	5'b01111: r_out = {11'b0, reg_w_add};
+	5'b10000: r_out = reg_w_data[31:16];
+	5'b10001: r_out = reg_w_data[15:0];
+	5'b10010: r_out = {11'b0, reg_rl_add};
+	5'b10011: r_out = {11'b0, reg_rr_add};
+	5'b10100: r_out = reg_rl_data[31:16];
+	5'b10101: r_out = reg_rl_data[15:0];
+	5'b10110: r_out = reg_rr_data[31:16];
+	5'b10111: r_out = reg_rr_data[15:0];
+	default: r_out = 16'b0;
+endcase
+end
+
+
 
 endmodule 

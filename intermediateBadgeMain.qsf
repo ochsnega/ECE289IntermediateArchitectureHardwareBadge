@@ -54,4 +54,40 @@ set_global_assignment -name VERILOG_FILE registerFile.v
 set_global_assignment -name PARTITION_NETLIST_TYPE SOURCE -section_id Top
 set_global_assignment -name PARTITION_FITTER_PRESERVATION_LEVEL PLACEMENT_AND_ROUTING -section_id Top
 set_global_assignment -name PARTITION_COLOR 16764057 -section_id Top
+set_global_assignment -name QIP_FILE Mem.qip
+set_global_assignment -name MIF_FILE mem_init.mif
+set_location_assignment PIN_M23 -to clk
+set_location_assignment PIN_M21 -to rst
+set_location_assignment PIN_N21 -to start
+set_location_assignment PIN_AB28 -to g_control
+set_location_assignment PIN_AC28 -to r_control[0]
+set_location_assignment PIN_AC27 -to r_control[1]
+set_location_assignment PIN_AD27 -to r_control[2]
+set_location_assignment PIN_AB27 -to r_control[3]
+set_location_assignment PIN_AC26 -to r_control[4]
+set_location_assignment PIN_E21 -to g_out[0]
+set_location_assignment PIN_E22 -to g_out[1]
+set_location_assignment PIN_E25 -to g_out[2]
+set_location_assignment PIN_E24 -to g_out[3]
+set_location_assignment PIN_H21 -to g_out[4]
+set_location_assignment PIN_G20 -to g_out[5]
+set_location_assignment PIN_G22 -to g_out[6]
+set_location_assignment PIN_H15 -to reg_w_en
+set_location_assignment PIN_G16 -to mem_wren
+set_location_assignment PIN_G19 -to r_out[0]
+set_location_assignment PIN_F19 -to r_out[1]
+set_location_assignment PIN_E19 -to r_out[2]
+set_location_assignment PIN_F21 -to r_out[3]
+set_location_assignment PIN_F18 -to r_out[4]
+set_location_assignment PIN_E18 -to r_out[5]
+set_location_assignment PIN_J19 -to r_out[6]
+set_location_assignment PIN_H19 -to r_out[7]
+set_location_assignment PIN_J17 -to r_out[8]
+set_location_assignment PIN_G17 -to r_out[9]
+set_location_assignment PIN_J15 -to r_out[10]
+set_location_assignment PIN_H16 -to r_out[11]
+set_location_assignment PIN_J16 -to r_out[12]
+set_location_assignment PIN_H17 -to r_out[13]
+set_location_assignment PIN_F15 -to r_out[14]
+set_location_assignment PIN_G15 -to r_out[15]
 set_instance_assignment -name PARTITION_HIERARCHY root_partition -to | -section_id Top
