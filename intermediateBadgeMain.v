@@ -1,13 +1,13 @@
 module intermediateBadgeMain( // TODO
-	input clk,
-	input rst,
-	input start,
-	input g_control,
-	input [4:0] r_control,
-	output reg [6:0] g_out,
-	output reg [15:0] r_out,
-	output reg reg_w_en,
-	output reg mem_wren
+	input clk, // Button 0
+	input rst, // Button 1
+	input start, // Button 2
+	input g_control, // SW 0
+	input [4:0] r_control, // SW 5-1
+	output reg [6:0] g_out, // LED G 6-0
+	output reg [15:0] r_out, // LED R 15-0
+	output reg reg_w_en, // LED R 17
+	output reg mem_wren // LED R 16
 );
 
 // Instantiate memory (Note: This takes a clock cycle)
@@ -39,50 +39,50 @@ reg [6:0] S;
 reg [6:0] NS;
 
 // Define states of FSM 
-parameter START = 7'd0,
-			 FETCH = 7'd1,
-			 FETCH_BUF = 7'd2,
-			 DECODE = 7'd3,
-			 RR_ALU = 7'd4,
-			 RI_ALU = 7'd5,
-			 LUI_ALU = 7'd6,
-			 AUIPC_ALU = 7'd7,
-			 LW = 7'd8,
-			 SW = 7'd9,
-			 JAL = 7'd10,
-			 JALR = 7'd11,
-			 BR_ALU = 7'd12,
-			 GET_REG_RR_ALU = 7'd13,
-			 CALC_RR_ALU = 7'd14,
-			 STORE_REG_RR_ALU = 7'd15,
-			 GET_REG_RI_ALU = 7'd16,
-			 CALC_RI_ALU = 7'd17,
-			 STORE_REG_RI_ALU = 7'd18,
-			 PC_INC = 7'd19,
-			 GET_REG_LUI_ALU = 7'd20,
-			 CALC_LUI_ALU = 7'd21,
-			 STORE_REG_LUI_ALU = 7'd22,
-			 GET_REG_AUIPC_ALU = 7'd23,
-			 CALC_AUIPC_ALU = 7'd24,
-			 STORE_REG_AUIPC_ALU = 7'd25,
-			 GET_REG_LW = 7'd26,
-			 GET_ADD_LW = 7'd27,
-			 GET_WORD_LW = 7'd28,
-			 LW_BUFF = 7'd29,
-			 GET_REG_SW = 7'd30,
-			 GET_ADD_SW = 7'd31,
-			 STORE_WORD_SW = 7'd32,
-			 SW_BUFF = 7'd33,
-			 GET_REG_JAL = 7'd34,
-			 CALC_JAL = 7'd35,
-			 STORE_REG_JAL = 7'd36,
-			 GET_REG_JALR = 7'd37,
-			 CALC_JALR = 7'd38,
-			 STORE_REG_JALR = 7'd39,
-			 GET_REG_BR_ALU = 7'd40,
-			 CALC_BR_ALU = 7'd41,
-			 DECIDE_BR = 7'd42,
-			 ERROR = 7'b1111111;
+parameter FSTART = 7'd0, 					// 7'b0000000
+			 FETCH = 7'd1, 					// 7'b0000001
+			 FETCH_BUF = 7'd2, 				// 7'b0000010
+			 DECODE = 7'd3, 					// 7'b0000011
+			 RR_ALU = 7'd4, 					// 7'b0000100
+			 RI_ALU = 7'd5, 					// 7'b0000101
+			 LUI_ALU = 7'd6, 					// 7'b0000110
+			 AUIPC_ALU = 7'd7,				// 7'b0000111
+			 LW = 7'd8, 						// 7'b0001000
+			 SW = 7'd9,							// 7'b0001001
+			 JAL = 7'd10, 						// 7'b0001010
+			 JALR = 7'd11, 					// 7'b0001011
+			 BR_ALU = 7'd12, 					// 7'b0001100
+			 GET_REG_RR_ALU = 7'd13, 		// 7'b0001101
+			 CALC_RR_ALU = 7'd14, 			// 7'b0001110
+			 STORE_REG_RR_ALU = 7'd15,		// 7'b0001111
+			 GET_REG_RI_ALU = 7'd16,		// 7'b0010000
+			 CALC_RI_ALU = 7'd17,			// 7'b0010001
+			 STORE_REG_RI_ALU = 7'd18,		// 7'b0010010
+			 PC_INC = 7'd19,					// 7'b0010011
+			 GET_REG_LUI_ALU = 7'd20,		// 7'b0010100
+			 CALC_LUI_ALU = 7'd21,			// 7'b0010101
+			 STORE_REG_LUI_ALU = 7'd22,	// 7'b0010110
+			 GET_REG_AUIPC_ALU = 7'd23, 	// 7'b0010111
+			 CALC_AUIPC_ALU = 7'd24,		// 7'b0011000
+			 STORE_REG_AUIPC_ALU = 7'd25,	// 7'b0011001
+			 GET_REG_LW = 7'd26,				// 7'b0011010
+			 GET_ADD_LW = 7'd27,				// 7'b0011011
+			 GET_WORD_LW = 7'd28,			// 7'b0011100
+			 LW_BUFF = 7'd29,					// 7'b0011101
+			 GET_REG_SW = 7'd30,				// 7'b0011110
+			 GET_ADD_SW = 7'd31,				// 7'b0011111
+			 STORE_WORD_SW = 7'd32,			// 7'b0100000
+			 SW_BUFF = 7'd33,					// 7'b0100001
+			 GET_REG_JAL = 7'd34,			// 7'b0100010
+			 CALC_JAL = 7'd35,				// 7'b0100011
+			 STORE_REG_JAL = 7'd36,			// 7'b0100100
+			 GET_REG_JALR = 7'd37,			// 7'b0100101
+			 CALC_JALR = 7'd38,				// 7'b0100110
+			 STORE_REG_JALR = 7'd39,		// 7'b0100111
+			 GET_REG_BR_ALU = 7'd40,		// 7'b0101000
+			 CALC_BR_ALU = 7'd41,			// 7'b0101001
+			 DECIDE_BR = 7'd42,				// 7'b0101010
+			 ERROR = 7'b1111111;				// 7'b1111111
 			 
 // Define program counter/instruction register:
 reg [7:0] PC;
@@ -92,7 +92,7 @@ reg [31:0] IR;
 always@(posedge clk or negedge rst)
 begin
 	if (rst == 1'b0)
-		S <= START;
+		S <= FSTART;
 	else
 		S <= NS;
 end
@@ -101,7 +101,7 @@ end
 always@(*)
 begin
 	case (S)
-		START:
+		FSTART:
 		begin
 			if (start == 1'b1)
 			begin
@@ -109,7 +109,7 @@ begin
 			end
 			else
 			begin
-				NS = START;
+				NS = FSTART;
 			end
 		end
 		FETCH: NS = FETCH_BUF;
@@ -195,6 +195,22 @@ begin
 	else
 	begin
 	case (S) // Change variables for each state (TODO)
+		FSTART:
+		begin
+			PC <= 8'b0;
+			IR <= 32'b0;
+			mem_address <= 8'b0;
+			mem_data <= 32'b0;
+			mem_wren <= 1'b0;
+			alu_l_in <= 32'b0;
+			alu_r_in <= 32'b0;
+			alu_control <= 5'b0;
+			reg_w_data <= 32'b0;
+			reg_w_add <= 5'b0;
+			reg_w_en <= 1'b0;
+			reg_rl_add <= 5'b0;
+			reg_rr_add <= 5'b0;
+		end
 		FETCH: 
 		begin
 			mem_address <= PC;
@@ -235,8 +251,8 @@ begin
 				default: alu_control <= 5'd31;
 			endcase
 			end
-			3'b110: alu_control <= 3;
-			3'b111: alu_control <= 2;
+			3'b110: alu_control <= 5'd3;
+			3'b111: alu_control <= 5'd2;
 		endcase
 		end
 		GET_REG_RR_ALU:
@@ -508,6 +524,36 @@ case (r_control)
 endcase
 end
 
+/*always@(*)
+begin
+case (r_control)
+	5'd0: r_out = IR[31:16];
+	5'd1: r_out = IR[15:0];
+	5'd2: r_out = {8'b0, PC};
+	5'd3: r_out = {8'b0, mem_address};
+	5'd4: r_out = mem_data[31:16];
+	5'd5: r_out = mem_data[15:0];
+	5'd6: r_out = mem_out[31:16];
+	5'd7: r_out = mem_out[15:0];
+	5'd8: r_out = alu_l_in[31:16];
+	5'd9: r_out = alu_l_in[15:0];
+	5'd10: r_out = alu_r_in[31:16];
+	5'd11: r_out = alu_r_in[15:0];
+	5'd12: r_out = alu_result[31:16];
+	5'd13: r_out = alu_result[15:0];
+	5'd14: r_out = {11'b0, alu_control};
+	5'd15: r_out = {11'b0, reg_w_add};
+	5'd16: r_out = reg_w_data[31:16];
+	5'd17: r_out = reg_w_data[15:0];
+	5'd18: r_out = {11'b0, reg_rl_add};
+	5'd19: r_out = {11'b0, reg_rr_add};
+	5'd20: r_out = reg_rl_data[31:16];
+	5'd21: r_out = reg_rl_data[15:0];
+	5'd22: r_out = reg_rr_data[31:16];
+	5'd23: r_out = reg_rr_data[15:0];
+	default: r_out = 16'b0;
+endcase
+end*/
 
 
 endmodule 
