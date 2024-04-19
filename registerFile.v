@@ -45,7 +45,7 @@ reg [31:0] r30;
 reg [31:0] r31;
 
 // Read path
-always@(*)
+always@(posedge clk or negedge rst)
 begin
 	case (rl_add)
 		5'd0: rl_data = r0;
